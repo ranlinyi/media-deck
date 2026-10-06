@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# steamdeck-touchfix - keep STEAM_TOUCH_CLICK_MODE=4 (gamescope touch passthrough)
+# so non-Steam apps launched in Steam Deck Game Mode keep full multi-touch.
+#
+# Vendored from https://github.com/ranlinyi/steamdeck-gamemode-multitouch-fix
+# Usage:
+#   steamdeck-touchfix                  # foreground watchdog
+#   steamdeck-touchfix -- <command...>  # run <command> with the watchdog
+set -euo pipefail
+
+XP="${STEAMDECK_TOUCHFIX_XPROP:-/usr/bin/xprop}"
+[ -x "$XP" ] || XP="$(command -v xprop || true)"
+[ -n "$XP" ] || { echo "steamdeck-touchfix: xprop not found" >&2; exit 1; }
+
+# gamescope on SteamOS runs with --xwayland-count 2 -> :0 and :1
+DISPLAYS="${STEAMDECK_TOUCHFIX_DISPLAYS:-:0 :1}"
+
+watch() {
+  while :; do
+    for d in $DISPLAYS; do
+      v=$(DISPLAY=$d "$XP" -root STEAM_TOUCH_CLICK_MODE 2>/dev/null) || continue
+      case "$v" in
+        *"= 4") ;;
+        *) DISPLAY=$d "$XP" -root -f STEAM_TOUCH_CLICK_MODE 32c \
+             -set STEAM_TOUCH_CLICK_MODE 4 2>/dev/null || true ;;
+      esac
+    done
+    sleep 2
+  done
+}
+
+if [ "$#" -eq 0 ]; then
+  watch
+else
+  [ "$1" = "--" ] && shift
+  watch &
+  WPID=$!
+  trap 'kill "$WPID" 2>/dev/null || true' EXIT INT TERM
+  "$@"
+fi

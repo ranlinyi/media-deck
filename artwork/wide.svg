@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="460" height="215" viewBox="0 0 460 215">
+<defs>
+<linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0b1020"/><stop offset="1" stop-color="#1b2748"/></linearGradient>
+<linearGradient id="ac" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#42b8ff"/><stop offset="1" stop-color="#8b7bff"/></linearGradient>
+<radialGradient id="glow" cx="0.5" cy="0.5" r="0.5"><stop offset="0" stop-color="#2f6bff" stop-opacity="0.38"/><stop offset="1" stop-color="#2f6bff" stop-opacity="0"/></radialGradient>
+</defs>
+<rect width="460" height="215" fill="url(#bg)"/>
+<circle cx="120" cy="108" r="160" fill="url(#glow)"/>
+<g transform="translate(120 108) scale(0.62)"><g>
+  <rect x="-130" y="-90" width="260" height="180" rx="20" fill="#233460" opacity="0.85" transform="rotate(-11)"/>
+  <rect x="-130" y="-90" width="260" height="180" rx="20" fill="#2c3f74" opacity="0.95" transform="rotate(-5)"/>
+  <rect x="-130" y="-90" width="260" height="180" rx="20" fill="#0f1930" stroke="#42b8ff" stroke-width="3"/>
+  <circle cx="0" cy="0" r="40" fill="url(#ac)"/>
+  <path d="M-11 -18 L20 0 L-11 18 Z" fill="#0b1020"/>
+</g></g>
+<text x="212" y="104" font-family="Noto Sans CJK SC, Noto Sans CJK HK, Noto Sans CJK JP, sans-serif" font-size="46" font-weight="700" fill="#ffffff">媒体库</text>
+<text x="214" y="139" font-family="Noto Sans CJK SC, Noto Sans CJK HK, Noto Sans CJK JP, sans-serif" font-size="18" fill="#93a9d9" letter-spacing="2">图片 · 视频 · 录像</text>
+<rect x="214" y="157" width="72" height="4" rx="2" fill="url(#ac)"/>
+</svg>
