@@ -27,7 +27,8 @@ media-deck 把「扫描 → 缩略图 → 播放」全部收进**同一个窗口
 - **文件夹视图**：点「文件夹」把内容按目录收纳成**带预览的文件夹卡片**（含项数）
 - 图片与视频**同一套**缩放/拖动：双指捏合缩放（0.2x–8x），**放大后**单指拖动平移
 - **Steam 录像**（DASH `.m4s` 分片）首次播放时自动用 ffmpeg 转封装成 mp4 并缓存
-- 视频**自动循环播放**
+- 视频**自动循环播放**，底部带**播放/暂停 + 进度条 + 时间**（触摸/鼠标可拖动跳转）
+- **动画图片（GIF / WebP）自动播放并循环**
 - 手柄开箱即用（内置 `evdev` 直读 Steam Deck 控制器）
 - 真实触摸：集成 `steamdeck-touchfix`，保持 `STEAM_TOUCH_CLICK_MODE=4`
 
@@ -79,6 +80,8 @@ chmod +x ~/.local/share/media-deck/launch.sh ~/.local/share/media-deck/fetch-cod
 
 - `app.py` —— GTK4 界面。用一个自定义 `Gdk.Paintable` 在**快照（snapshot）阶段**做缩放/平移，
   控件尺寸**始终不变**，所以缩放只触发重绘、不引发布局抖动，连续顺滑。
+- 播放控制条用 `Gtk.MediaControls`（查看器里没有 `Gtk.Video`，因此只有这一条，不会重复）；
+  动画图片用 `GdkPixbuf.PixbufAnimation`，由同一个 33ms 定时器逐帧推进。
 - `media.py` —— 扫描（去重/跟随软链接/跳过 thumbnails）、缩略图（图片走 GdkPixbuf，视频走 ffmpeg）、
   Steam 录像 DASH 分片转封装。
 - `steamdeck-touchfix` —— 来自 [steamdeck-gamemode-multitouch-fix](https://github.com/ranlinyi/steamdeck-gamemode-multitouch-fix)：
@@ -86,6 +89,13 @@ chmod +x ~/.local/share/media-deck/launch.sh ~/.local/share/media-deck/fetch-cod
   gamescope 便把触摸降级成单点鼠标；该脚本持续把它改回 `4`（真触摸透传）。
 - `fetch-codec.sh` —— 从 SteamOS 官方仓库下载 `gst-libav`，解出 `libgstlibav.so` 放进 `gst/`，
   启动时用 `GST_PLUGIN_PATH` 指过去。
+
+## 命令行
+
+```bash
+~/.local/share/media-deck/launch.sh --open ~/Pictures/a.gif   # 启动即打开指定文件
+MEDIA_DECK_OPEN=~/Videos/b.mp4 ~/.local/share/media-deck/launch.sh
+```
 
 ## 故障排除
 

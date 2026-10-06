@@ -25,7 +25,8 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Pango", "1.0")
 gi.require_version("Gst", "1.0")
 gi.require_version("Graphene", "1.0")
-from gi.repository import Gtk, Gdk, GLib, Gio, GObject, Graphene, Pango, Gst
+gi.require_version("GdkPixbuf", "2.0")
+from gi.repository import Gtk, Gdk, GLib, Gio, GObject, Graphene, Pango, Gst, GdkPixbuf
 
 import media
 
@@ -50,6 +51,7 @@ STICK_THRESHOLD = 20000
 STICK_INTERVAL = 130
 SEEK_STEP = 5.0
 ZOOM_GAIN = 1.1
+ANIM_EXT = {".gif", ".webp"}
 
 
 def dbg(*args):
@@ -231,9 +233,10 @@ class Tile(Gtk.FlowBoxChild):
 
 
 class MainWindow(Gtk.ApplicationWindow):
-    def __init__(self, app, fullscreen=False):
+    def __init__(self, app, fullscreen=False, preopen=None):
         super().__init__(application=app, title="媒体库")
         self.set_default_size(1280, 800)
+        self.pending_open = preopen
         self.flow = None
         self.stack = None
         self.items = []
@@ -257,6 +260,8 @@ class MainWindow(Gtk.ApplicationWindow):
         self.token = 0
         self.gamepad = None
         self.triggers = [False, False]
+        self.gif_iter = None
+        self.gif_next = 0.0
 
         hb = Gtk.HeaderBar()
         self.set_titlebar(hb)
@@ -391,6 +396,12 @@ class MainWindow(Gtk.ApplicationWindow):
         self.vstack.add_named(stbox, "status")
         box.append(self.vstack)
 
+        # Native playback controls (play/pause + seek bar). There is no
+        # Gtk.Video here, so this is the only progress bar in the window.
+        self.controls = Gtk.MediaControls()
+        self.controls.set_visible(False)
+        box.append(self.controls)
+
         self.stack.add_named(box, "viewer")
 
     def show_media_page(self, which):
@@ -399,6 +410,7 @@ class MainWindow(Gtk.ApplicationWindow):
         self.pan = [0.0, 0.0]
         self.picture.set_visible(True)
         self.vstack.set_visible_child_name("media")
+        self.controls.set_visible(which == "video")
         self.layout_media()
 
     def _on_stage_size(self, *_a):
@@ -450,6 +462,11 @@ class MainWindow(Gtk.ApplicationWindow):
             except Exception:
                 pass
             self.media_stream = None
+        self.gif_iter = None
+        try:
+            self.controls.set_media_stream(None)
+        except Exception:
+            pass
         self.paintable.texture = None
         try:
             self.picture.queue_draw()
@@ -535,13 +552,7 @@ class MainWindow(Gtk.ApplicationWindow):
         token = self.token
         if item["kind"] == "image":
             self.show_media_page("image")
-            try:
-                tex = Gdk.Texture.new_from_filename(item["path"])
-                self.paintable.texture = tex
-                self.media_size = (tex.get_width(), tex.get_height())
-                self.layout_media()
-            except Exception as e:
-                self.set_status("无法显示这张图片：" + str(e))
+            self.load_image(item["path"])
         elif item["kind"] == "video":
             self.play_file(item["path"])
         else:
@@ -570,12 +581,61 @@ class MainWindow(Gtk.ApplicationWindow):
         self.media_stream = stream
         self.show_media_page("video")
         try:
+            self.controls.set_media_stream(stream)
+        except Exception:
+            pass
+        try:
             stream.set_loop(True)
         except Exception:
             pass
         stream.play()
 
+    def load_image(self, path):
+        """Show a still image, or autoplay it when it is an animated GIF/WebP."""
+        if Path(path).suffix.lower() in ANIM_EXT:
+            try:
+                anim = GdkPixbuf.PixbufAnimation.new_from_file(path)
+                if not anim.is_static_image():
+                    it = anim.get_iter(None)
+                    pb = it.get_pixbuf()
+                    self.gif_iter = it
+                    self.paintable.texture = Gdk.Texture.new_for_pixbuf(pb)
+                    self.media_size = (pb.get_width(), pb.get_height())
+                    delay = it.get_delay_time() or 100
+                    self.gif_next = time.monotonic() + max(0.02, delay / 1000.0)
+                    self.layout_media()
+                    return
+            except Exception as e:
+                dbg("animation failed:", e)
+        try:
+            tex = Gdk.Texture.new_from_filename(path)
+            self.paintable.texture = tex
+            self.media_size = (tex.get_width(), tex.get_height())
+            self.layout_media()
+        except Exception as e:
+            self.set_status("无法显示这张图片：" + str(e))
+
+    def _advance_gif(self):
+        it = self.gif_iter
+        if it is None:
+            return
+        try:
+            now = time.monotonic()
+            if now < self.gif_next:
+                return
+            it.advance(None)
+            pb = it.get_pixbuf()
+            self.paintable.texture = Gdk.Texture.new_for_pixbuf(pb)
+            self.picture.queue_draw()
+            delay = it.get_delay_time() or 100
+            self.gif_next = now + max(0.02, delay / 1000.0)
+        except Exception as e:
+            dbg("gif tick failed:", e)
+            self.gif_iter = None
+
     def _video_tick(self):
+        if self.gif_iter is not None:
+            self._advance_gif()
         if self.media_kind == "video" and self.media_stream is not None:
             try:
                 img = self.media_stream.get_current_image()
@@ -904,13 +964,22 @@ class MainWindow(Gtk.ApplicationWindow):
         self.items = items
         self.update_nav()
         self.apply_filters()
+        if self.pending_open:
+            target = os.path.realpath(self.pending_open)
+            self.pending_open = None
+            for idx, it in enumerate(self.view):
+                p = it.get("path")
+                if p and os.path.realpath(p) == target:
+                    self.open_item_by_index(idx)
+                    break
         return False
 
 
 class MediaDeckApp(Gtk.Application):
-    def __init__(self, fullscreen=False):
+    def __init__(self, fullscreen=False, preopen=None):
         super().__init__(application_id="com.steamdeck.mediadeck", flags=Gio.ApplicationFlags.FLAGS_NONE)
         self.fullscreen = fullscreen
+        self.preopen = preopen
 
     def do_startup(self):
         Gtk.Application.do_startup(self)
@@ -923,13 +992,20 @@ class MediaDeckApp(Gtk.Application):
     def do_activate(self):
         win = self.props.active_window
         if not win:
-            win = MainWindow(self, self.fullscreen)
+            win = MainWindow(self, self.fullscreen, self.preopen)
         win.present()
 
 
 def main():
     fullscreen = "--fullscreen" in sys.argv
-    app = MediaDeckApp(fullscreen)
+    preopen = None
+    if "--open" in sys.argv:
+        i = sys.argv.index("--open")
+        if i + 1 < len(sys.argv):
+            preopen = sys.argv[i + 1]
+    if not preopen:
+        preopen = os.environ.get("MEDIA_DECK_OPEN") or None
+    app = MediaDeckApp(fullscreen, preopen)
     return app.run([sys.argv[0]])
 
 

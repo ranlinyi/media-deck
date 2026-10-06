@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026-10-07（修复版）
+- 修复视频进度条丢失：查看器底部加回 `Gtk.MediaControls`（仅视频时显示，绑定 `Gtk.MediaFile`）
+- 修复 GIF 不动：`.gif` / `.webp` 现在自动播放并循环（`GdkPixbuf.PixbufAnimation` + 33ms 定时器逐帧推进）
+- 新增 `--open <文件>`（或环境变量 `MEDIA_DECK_OPEN`）启动时直接打开指定文件
+
 ## 2026-10-07
 - 首次发布
 - 原生 GTK4 单窗口浏览器：图片 / 视频 / Steam 录像
