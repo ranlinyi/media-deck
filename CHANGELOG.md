@@ -10,5 +10,6 @@
 - 随 app 附带 gst-libav（H.264/AAC），不改系统
 - 内置 evdev 手柄支持（左摇杆轮询、十字键、A/B、L1/R1 切分类或快进快退）
 - 集成 steamdeck-touchfix，让游戏模式透传真触摸
-- Steam 四卡槽自定义美术
+- Steam 四卡槽自定义美术（hero 配图改为图标在左、标题在右的镜像排布）
 - 一键安装脚本 install.sh
+- artwork/make-preview.sh：一键复现 README 顶部的配图总览
